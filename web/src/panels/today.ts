@@ -62,8 +62,19 @@ export function todayChips(s: AppState): Chip[] {
   const chips: Chip[] = [];
 
   if (on('alerts')) {
+    // One chip per event and level: a storm often comes as the same warning for many zones.
+    const groups = new Map<string, { level: string; event: string; areas: string[]; expires: string }>();
     for (const a of s.sections.alerts?.data?.alerts || []) {
-      chips.push({ cls: `alert ${a.level}`, text: a.event, sub: `${shortArea(a.area, s)} · ${t('today.until', { time: timeOf(new Date(a.expires)) })}` });
+      const key = `${a.level}|${a.event}`;
+      const g = groups.get(key);
+      if (!g) groups.set(key, { level: a.level, event: a.event, areas: [a.area], expires: a.expires });
+      else {
+        g.areas.push(a.area);
+        if (Date.parse(a.expires) > Date.parse(g.expires)) g.expires = a.expires;
+      }
+    }
+    for (const g of groups.values()) {
+      chips.push({ cls: `alert ${g.level}`, text: g.event, sub: `${shortArea(g.areas.join('; '), s)} · ${t('today.until', { time: timeOf(new Date(g.expires)) })}` });
     }
   }
 
@@ -168,7 +179,32 @@ export function todayChips(s: AppState): Chip[] {
 export function renderTodayStrip(s: AppState) {
   const chips = todayChips(s);
   if (!chips.length) return '';
-  return `<section class="today-strip" aria-label="${esc(t('today.title'))}">
+  return `<section class="today-strip" aria-label="${esc(t('today.title'))}"><div class="today-track">
     ${chips.map((c) => `<div class="today-chip ${esc(c.cls)}"><span class="tc-dot"></span><div><b>${esc(c.text)}</b>${c.sub ? `<small>${esc(c.sub)}</small>` : ''}</div></div>`).join('')}
-  </section>`;
+  </div></section>`;
+}
+
+const MARQUEE_PX_PER_S = 45;
+let marqueeSince = 0;
+
+/** After render: if the chips don't fit in two rows, scroll them in one row instead of hiding
+ *  the rest. The loop's phase survives re-renders so a data refresh doesn't make it jump. */
+export function fitTodayStrip(el: HTMLElement) {
+  const strip = el.querySelector<HTMLElement>('.today-strip');
+  const track = strip?.querySelector<HTMLElement>('.today-track');
+  const rows = new Set([...(track?.children || [])].map((c) => (c as HTMLElement).offsetTop)).size;
+  if (!strip || !track || rows <= 2 || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    marqueeSince = 0;
+    return;
+  }
+  strip.classList.add('scrolling');
+  for (const chip of [...track.children]) {
+    const copy = chip.cloneNode(true) as HTMLElement;
+    copy.setAttribute('aria-hidden', 'true');
+    track.append(copy);
+  }
+  const duration = Math.max(20, track.scrollWidth / 2 / MARQUEE_PX_PER_S);
+  if (!marqueeSince) marqueeSince = performance.now();
+  track.style.animationDuration = `${duration}s`;
+  track.style.animationDelay = `-${((performance.now() - marqueeSince) / 1000) % duration}s`;
 }

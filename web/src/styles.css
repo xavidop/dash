@@ -3077,16 +3077,35 @@ select.set-input {
   grid-template-rows: auto 1fr auto auto;
 }
 .today-strip {
+  /* The padding gives the shadows room inside the clip, and the negative margin keeps the strip
+     aligned. */
+  padding: 0.3rem 0.6rem 0.9rem;
+  margin: -0.3rem -0.6rem -0.5rem;
+  /* At most two rows of chips; if more don't fit, fitTodayStrip() turns it into a marquee. */
+  max-height: calc(2 * 3.5rem + 0.6rem + 1.2rem);
+  overflow: hidden;
+}
+.today-track {
   display: flex;
   flex-wrap: wrap;
   align-content: flex-start;
   gap: 0.6rem;
-  /* Exactly two rows of chips; extra chips are hidden whole, never cut in half. The padding gives
-     the shadows room inside the clip, and the negative margin keeps the strip aligned. */
-  padding: 0.3rem 0.6rem 0.9rem;
-  margin: -0.3rem -0.6rem -0.5rem;
-  max-height: calc(2 * 3.5rem + 0.6rem + 1.2rem);
-  overflow: hidden;
+}
+/* One scrolling row. Spacing is a margin (not gap) so the duplicated half loops seamlessly. */
+.today-strip.scrolling {
+  mask-image: linear-gradient(90deg, transparent, #000 3%, #000 97%, transparent);
+}
+.today-strip.scrolling .today-track {
+  flex-wrap: nowrap;
+  gap: 0;
+  width: max-content;
+  animation: marquee 40s linear infinite;
+  will-change: transform;
+}
+.today-strip.scrolling .today-chip {
+  flex: none;
+  max-width: none;
+  margin-right: 0.6rem;
 }
 .today-chip {
   --dot: var(--accent);

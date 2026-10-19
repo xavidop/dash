@@ -3,7 +3,7 @@ import { clock, ampm, longDate, greeting, localTime, hourLabel, dayName, esc } f
 import { weatherIcon, ICON } from '../icons';
 import { staleLabel } from '../ui';
 import { t } from '../i18n';
-import { renderTodayStrip } from './today';
+import { renderTodayStrip, fitTodayStrip } from './today';
 
 export function renderHome(el: HTMLElement, s: AppState) {
   const w = s.sections.weather?.data;
@@ -74,4 +74,5 @@ export function renderHome(el: HTMLElement, s: AppState) {
       </section>
       ${staleLabel(s.sections.weather, s.config?.refresh.weatherMinutes ?? 10)}
     </div>`;
+  fitTodayStrip(el);
 }
