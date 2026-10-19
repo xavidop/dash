@@ -2,7 +2,7 @@
   "name": "dash",
   "version": "0.1.0",
   "private": true,
-  "description": "Dash: an ambient smart display (weather, news, live sports, markets, notes) for a wall-mounted tablet or kiosk.",
+  "description": "Open-source ambient smart display for a wall tablet or kiosk: weather, calendar, news, markets, live sports, playoff brackets, Spotify with synced lyrics, cooking mode and a \"Hey Dash\" voice assistant.",
   "type": "module",
   "engines": {
     "node": ">=22"
