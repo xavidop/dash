@@ -913,8 +913,10 @@ setInterval(() => {
   }
 }, 5 * 60e3).unref();
 
+// Bind IPv4 explicitly: under WSL2 a dual-stack `::` socket is only forwarded to Windows on ::1,
+// so http://127.0.0.1:<port> (the only redirect Spotify accepts) would be refused.
 app
-  .listen(config.port, () => {
+  .listen(config.port, '0.0.0.0', () => {
     console.log(`[dash] listening on http://localhost:${config.port} (${config.language}, ${config.timezone})`);
     start().catch((err) => console.error('[dash] startup failed', err));
   })
