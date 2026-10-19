@@ -2,6 +2,8 @@
 
 Thanks for helping. Dash runs on a wall-mounted screen all day, so changes should stay light on CPU, degrade gracefully when a source is down, and keep every on-screen string translatable.
 
+This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md). Security problems go through [SECURITY.md](SECURITY.md), not public issues. The code layout is described in [docs/architecture.md](docs/architecture.md).
+
 ## Getting started
 
 ```bash

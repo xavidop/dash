@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security problem
+    url: https://github.com/xavidop/dash/security/advisories/new
+    about: Report privately through GitHub's vulnerability reporting, not as an issue.
+  - name: Setup help
+    url: https://github.com/xavidop/dash/blob/main/docs/configuration.md
+    about: Every config key, the supported competitions, Spotify and kiosk setup.

@@ -1,0 +1,30 @@
+name: Feature request
+description: A panel, a competition, a language, a data source or an idea
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you'd like
+      description: What should Dash show or do, and when. For a competition or data source, include where the data would come from (free, no API key, see CONTRIBUTING.md).
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it's useful on an always-on display
+      description: Dash is read from across the room, so the best features are glanceable or hands-free.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Home / weather
+        - Sports
+        - Kitchen (recipes, cooking, shopping, timers)
+        - Music
+        - Voice assistant
+        - Calendar / notes / everyday
+        - A new language
+        - Kiosk / reliability
+        - Other

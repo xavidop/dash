@@ -1,0 +1,44 @@
+name: Bug report
+description: Something on the screen is wrong, missing or broken
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead. A photo or screenshot of the screen helps a lot.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to reproduce
+      placeholder: |
+        1. Follow Arsenal and the Premier League
+        2. Wait for a match day
+        3. The round panel shows…
+  - type: textarea
+    id: logs
+    attributes:
+      label: Server log
+      description: Lines from the terminal or `data/server.log` around the time it happened. Check `http://<dash>:3000/api/health` too; `pausedSources` and `livePolling` often explain missing data.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: Dash version
+      description: The commit you're running (`git rev-parse --short HEAD`) and your Node version (`node -v`).
+      placeholder: abc1234, Node 26.1.0
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Device, browser and language
+      placeholder: Surface Go 2, Edge kiosk, Windows 11, language es, timezone Europe/Madrid
+  - type: textarea
+    id: config
+    attributes:
+      label: Relevant config
+      description: The part of `config.json` involved (favourites, features…). Remove calendar links, Wi-Fi details and anything private first.
+      render: json
