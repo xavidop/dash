@@ -1,0 +1,21 @@
+Windows Registry Editor Version 5.00
+
+; Edge policies for the Dash kiosk (machine-wide; affects all Edge windows on this PC).
+; - Allow geolocation without a prompt, so Dash can use Windows location services
+; - Allow the microphone for Dash (voice assistant) without a prompt
+; - Allow the camera for Dash (wake on motion) without a prompt
+; - No first-run screens, no translate bar, no "restore pages" bubble after a power cut
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Edge]
+"DefaultGeolocationSetting"=dword:00000001
+"HideFirstRunExperience"=dword:00000001
+"TranslateEnabled"=dword:00000000
+"RestoreOnStartup"=dword:00000005
+"HideRestoreDialogEnabled"=dword:00000001
+"StartupBoostEnabled"=dword:00000000
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Edge\AudioCaptureAllowedUrls]
+"1"="http://localhost:3000"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Edge\VideoCaptureAllowedUrls]
+"1"="http://localhost:3000"

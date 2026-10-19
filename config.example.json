@@ -1,0 +1,177 @@
+{
+  "port": 3000,
+  "userName": "",
+  "language": "en",
+  "timezone": "Europe/London",
+  "clock24h": true,
+  "location": {
+    "mode": "auto",
+    "fallback": {
+      "lat": 51.5074,
+      "lon": -0.1278,
+      "name": "London"
+    }
+  },
+  "rotationSeconds": 60,
+  "touchPauseSeconds": 120,
+  "nightMode": {
+    "enabled": true,
+    "start": "23:00",
+    "end": "07:00"
+  },
+  "refresh": {
+    "weatherMinutes": 10,
+    "newsMinutes": 15,
+    "teamsMinutes": 30,
+    "liveIdleSeconds": 600,
+    "liveActiveSeconds": 20
+  },
+  "news": {
+    "maxAgeHours": 24,
+    "sources": []
+  },
+  "favorites": {
+    "teams": [
+      {
+        "key": "arsenal",
+        "league": "eng.1",
+        "name": "Arsenal"
+      },
+      {
+        "key": "lakers",
+        "league": "nba",
+        "name": "Los Angeles Lakers",
+        "displayName": "Lakers"
+      },
+      {
+        "key": "yankees",
+        "league": "mlb",
+        "name": "New York Yankees",
+        "displayName": "Yankees"
+      },
+      {
+        "key": "chiefs",
+        "league": "nfl",
+        "name": "Kansas City Chiefs",
+        "displayName": "Chiefs"
+      },
+      {
+        "key": "rangers",
+        "league": "nhl",
+        "name": "New York Rangers",
+        "displayName": "Rangers"
+      }
+    ],
+    "drivers": [],
+    "players": []
+  },
+  "liveLeagues": [
+    {
+      "provider": "espn",
+      "league": "eng.1"
+    },
+    {
+      "provider": "espn",
+      "league": "uefa.champions"
+    }
+  ],
+  "finance": {
+    "symbols": [
+      "^GSPC",
+      "^FTSE",
+      "AAPL",
+      "MSFT",
+      "BTC-USD",
+      "EURUSD=X"
+    ],
+    "refreshMinutes": 5
+  },
+  "quote": {
+    "enabled": true
+  },
+  "sportsNews": {
+    "enabled": true,
+    "perTeam": 4
+  },
+  "features": {
+    "alerts": true,
+    "airQuality": true,
+    "uv": true,
+    "holidays": true,
+    "moon": true,
+    "electricity": true,
+    "reminders": true,
+    "countdowns": true,
+    "whereToWatch": true,
+    "wifiQr": false,
+    "preMatch": true,
+    "matchday": true,
+    "radar": true,
+    "calendar": true,
+    "cooking": true,
+    "spotify": true,
+    "assistant": false,
+    "brackets": true,
+    "motion": false
+  },
+  "electricity": {
+    "region": "peninsula"
+  },
+  "countdowns": {
+    "withinDays": 30
+  },
+  "radar": {
+    "showWhen": "rain",
+    "tiles": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+    "attribution": "© OpenStreetMap"
+  },
+  "calendar": {
+    "urls": [],
+    "days": 14
+  },
+  "cooking": {
+    "model": "gemini-3.8-flash"
+  },
+  "spotify": {
+    "clientId": ""
+  },
+  "briefing": {
+    "time": null,
+    "weekdays": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      0
+    ]
+  },
+  "bins": [],
+  "assistant": {
+    "model": "gemini-3.8-live",
+    "voice": "Kore",
+    "wakeWords": [
+      "dash"
+    ],
+    "idleSeconds": 8,
+    "allowRemote": false
+  },
+  "wifi": {
+    "ssid": "",
+    "password": "",
+    "security": "WPA",
+    "hidden": false
+  },
+  "watchdog": {
+    "maxMemoryMB": 700,
+    "dailyReload": "04:00"
+  },
+  "alerts": {
+    "areas": []
+  },
+  "motion": {
+    "dimAfterMinutes": 10,
+    "sensitivity": "medium"
+  }
+}

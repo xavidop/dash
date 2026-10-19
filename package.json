@@ -1,0 +1,41 @@
+{
+  "name": "dash",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Dash: an ambient smart display (weather, news, live sports, markets, notes) for a wall-mounted tablet or kiosk.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n server,web -c blue,magenta \"node --watch server/index.js\" \"vite --config web/vite.config.ts\"",
+    "dev:demo": "concurrently -k -n server,web -c blue,magenta \"node --watch server/index.js --demo\" \"vite --config web/vite.config.ts\"",
+    "build": "vite build --config web/vite.config.ts",
+    "start": "node server/supervise.js",
+    "demo": "npm run build && node server/supervise.js --demo",
+    "typecheck": "tsc -p web --noEmit",
+    "test": "node --test \"tests/*.test.js\"",
+    "start:once": "node server/index.js"
+  },
+  "dependencies": {
+    "@fontsource-variable/outfit": "^5.3.0",
+    "express": "^5.3.0",
+    "fast-xml-parser": "^5.11.2",
+    "ical.js": "^2.2.1",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.6",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4"
+  },
+  "keywords": [
+    "smart-display",
+    "kiosk",
+    "dashboard",
+    "sports",
+    "live-scores",
+    "nest-hub"
+  ],
+  "license": "MIT"
+}
