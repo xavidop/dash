@@ -207,7 +207,30 @@ const refreshHolidays = async () => {
   if (config.features.holidays && loc?.country) await job('holidays', () => holidays.fetch({ country: loc.country, region: loc.region, timezone: config.timezone, language: config.language }))();
 };
 
-async function refreshFavorites(opts) {
+// One card rebuild at a time. A rebuild takes a while (several requests per team), and two
+// overlapping ones finish in any order: the older one, built from the favourites before a change,
+// could land last and remove a team just added. A call during a rebuild queues one more pass.
+let favoritesRun = null;
+let favoritesAgain = null; // options for the queued pass
+async function refreshFavorites(opts = {}) {
+  if (favoritesRun) {
+    favoritesAgain = { force: !!(favoritesAgain?.force || opts.force) };
+    return favoritesRun;
+  }
+  favoritesRun = (async () => {
+    let next = opts;
+    do {
+      favoritesAgain = null;
+      await refreshFavoritesOnce(next);
+      next = favoritesAgain;
+    } while (next);
+  })().finally(() => {
+    favoritesRun = null;
+  });
+  return favoritesRun;
+}
+
+async function refreshFavoritesOnce(opts) {
   try {
     await favorites.refresh(opts);
     store.setMeta('teamsFor', favoritesSig());

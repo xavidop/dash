@@ -186,6 +186,11 @@ export function renderTodayStrip(s: AppState) {
 
 const MARQUEE_PX_PER_S = 45;
 let marqueeSince = 0;
+// What each strip was rendered from, before the marquee duplicated its chips.
+const sources = new WeakMap<Element, string>();
+
+/** The HTML a strip on screen was rendered from (to tell whether it needs replacing). */
+export const stripSource = (strip: Element) => sources.get(strip) ?? strip.outerHTML;
 
 /** After render: if the chips don't fit in two rows, scroll them in one row instead of hiding
  *  the rest. The loop's phase survives re-renders so a data refresh doesn't make it jump. */
@@ -197,6 +202,7 @@ export function fitTodayStrip(el: HTMLElement) {
     marqueeSince = 0;
     return;
   }
+  sources.set(strip, strip.outerHTML);
   strip.classList.add('scrolling');
   for (const chip of [...track.children]) {
     const copy = chip.cloneNode(true) as HTMLElement;

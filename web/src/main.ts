@@ -11,7 +11,7 @@ import { renderFinance } from './panels/finance';
 import { renderQuote } from './panels/quote';
 import { renderSportsNews } from './panels/sportsnews';
 import { renderNotes, visibleNotes } from './panels/notes';
-import { renderTodayStrip } from './panels/today';
+import { renderTodayStrip, fitTodayStrip, stripSource } from './panels/today';
 import { initTimers, isTimersOpen } from './timers';
 import { initExtras, isExtrasOpen } from './extras';
 import { renderElectricity } from './panels/electricity';
@@ -381,11 +381,14 @@ subscribe((s, changed) => {
   } else if (spec(current).deps.includes(changed as never)) renderPanel(current);
   // Live scores feed the Today strip: patch just the strip instead of re-rendering Home.
   if (changed === 'live' && current === 'home') {
-    const strip = panelEl('home').querySelector('.today-strip');
+    const home = panelEl('home');
+    const strip = home.querySelector('.today-strip');
     const html = renderTodayStrip(s);
-    if (strip ? strip.outerHTML !== html : html) {
-      if (strip) strip.outerHTML = html || '';
-      else renderPanel('home');
+    if (strip ? stripSource(strip) !== html : html) {
+      if (strip) {
+        strip.outerHTML = html || '';
+        fitTodayStrip(home);
+      } else renderPanel('home');
     }
   }
   if (changed === 'live') {
