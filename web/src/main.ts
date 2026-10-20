@@ -422,6 +422,18 @@ let lastCompCycle = Date.now();
 let downX = 0;
 let downY = 0;
 let downAt = 0;
+let swipedAt = 0;
+// A swipe over a button ends in a click on it: swallow that click before any handler sees it.
+window.addEventListener(
+  'click',
+  (e) => {
+    if (Date.now() - swipedAt < 500) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+  },
+  true,
+);
 document.addEventListener('pointerdown', (e) => {
   if (isSettingsOpen()) return;
   downX = e.clientX;
@@ -441,6 +453,15 @@ document.addEventListener('pointerup', (e) => {
   if (mode === 'panels' && current === 'home' && target.closest('.now-weather') && Math.abs(e.clientX - downX) < 20 && radarAvailable(getState())) {
     openRadarSheet();
     return;
+  }
+  const swipeX = e.clientX - downX;
+  const swiped = Math.abs(swipeX) > 60 && Math.abs(swipeX) > Math.abs(e.clientY - downY) * 1.3 && Date.now() - downAt < 1200;
+  // The Music panel is almost all buttons and tiles: a swipe over them still changes panel (and the
+  // click that follows it mustn't play the tile).
+  if (swiped && mode === 'panels' && target.closest('.music [data-mu], .mu-search')) {
+    swipedAt = Date.now();
+    pausedUntil = Date.now() + touchPauseMs();
+    return step(swipeX < 0 ? 1 : -1);
   }
   if (isTimersOpen() || isExtrasOpen() || isAssistantOpen() || isCooking() || isRecipeOpen() || target.closest('.rx-sheet, .timers, .timer-btn, .timer-pills, .timer-ring, .wifi-btn, .wifi-sheet, .reminder-ring, .assistant-btn, .assistant-sheet, .cooking-layer, .music-pill, .music-btn, .music [data-mu], .mu-search')) {
     pausedUntil = Date.now() + touchPauseMs();

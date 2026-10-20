@@ -131,6 +131,9 @@ body[data-wx='rain'] .sky-veil {
   inset: 0;
   opacity: 0;
   visibility: hidden;
+  /* Hidden panels must never take taps: a child that sets `visibility: visible` (a team card's
+     competition slide) would otherwise stay clickable, invisible, on top of the panel on screen. */
+  pointer-events: none;
   transition:
     opacity 0.8s ease,
     transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1),
@@ -140,6 +143,7 @@ body[data-wx='rain'] .sky-veil {
 .panel.active {
   opacity: 1;
   visibility: visible;
+  pointer-events: auto;
   transition:
     opacity 0.8s ease,
     transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1),
@@ -5080,6 +5084,9 @@ body.settings-open .music-pill {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* Vertical scrolling is the browser's; a horizontal swipe stays ours (next/previous panel).
+     Without this, a swipe here is taken over by the browser and never reaches the page. */
+  touch-action: pan-y;
   scrollbar-width: none;
   display: flex;
   flex-direction: column;

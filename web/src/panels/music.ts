@@ -93,7 +93,12 @@ let lyricsOn = (() => {
   }
 })();
 
-const rerender = () => window.dispatchEvent(new CustomEvent('dash:render', { detail: 'music' }));
+// Something on the panel itself changed (a tap, search results…): the next render must happen.
+let dirty = true;
+const rerender = () => {
+  dirty = true;
+  window.dispatchEvent(new CustomEvent('dash:render', { detail: 'music' }));
+};
 const getJson = <T>(url: string): Promise<T | null> => fetch(url).then((r) => (r.ok ? r.json() : null)).catch(() => null);
 
 async function loadPicker() {
@@ -246,8 +251,19 @@ function pickerHtml(s: AppState, m: SpotifyState | null) {
     </div>`;
 }
 
+/** What Spotify state the panel shows. The server publishes the player every 5–30 s; progress moves
+ *  locally, so an update that changes none of this needs no re-render. */
+let lastSig = '';
+const viewSig = (s: AppState, m: SpotifyState | null) =>
+  JSON.stringify([m?.item?.uri, m?.item?.image, m?.playing, m?.device?.name, m?.device?.volume, s.config?.language, !!s.config?.assistant]);
+
 export function renderMusic(el: HTMLElement, s: AppState) {
   const m = music(s);
+  // Re-rendering for nothing would close the tablet's keyboard, reset scrolling and drop taps.
+  const sig = viewSig(s, m);
+  if (!dirty && sig === lastSig && el.firstElementChild) return;
+  dirty = false;
+  lastSig = sig;
   const playingView = !!m?.item && !browse;
   // Keep the search box focused across re-renders (state updates arrive every few seconds).
   const focused = document.activeElement?.matches?.('[data-mu-search]');
@@ -453,7 +469,9 @@ async function onClick(e: Event) {
       return rerender();
     default:
       el.classList.add('busy');
-      await control(a);
+      await control(a).catch(() => {});
+      // A command that changes nothing visible (volume already at max) gets no re-render to clear it.
+      el.classList.remove('busy');
   }
 }
 
@@ -507,6 +525,7 @@ export function initMusic() {
       detail = null;
       detailLoading = '';
       trail.length = 0;
+      dirty = true;
     }
     renderPill();
   }).observe(document.body, { attributes: true, attributeFilter: ['data-panel'] });
