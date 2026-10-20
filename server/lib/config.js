@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, renameSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -85,9 +85,30 @@ const DEFAULTS = {
   assistant: { model: 'gemini-3.8-live', voice: 'Kore', wakeWords: ['dash'], idleSeconds: 8, allowRemote: false },
 };
 
+const CONFIG_FILE = () => process.env.DASH_CONFIG || path.join(ROOT, 'config.json');
+
+/**
+ * Writes on-screen changes back to config.json, so it always holds the real setup. `edit` changes
+ * the file's own JSON (not the merged config, so defaults the user never wrote stay out). Without
+ * a config.json yet, it starts from config.example.json. Returns true when the file changed.
+ */
+export function updateConfigFile(edit) {
+  const file = CONFIG_FILE();
+  const from = existsSync(file) ? file : path.join(ROOT, 'config.example.json');
+  const before = existsSync(from) ? readFileSync(from, 'utf8') : '{}';
+  const user = JSON.parse(before);
+  edit(user);
+  const after = `${JSON.stringify(user, null, 2)}\n`;
+  if (from === file && after === before) return false;
+  const tmp = `${file}.tmp`;
+  writeFileSync(tmp, after);
+  renameSync(tmp, file);
+  return true;
+}
+
 export function loadConfig() {
   // config.json is personal (gitignored); config.example.json is the committed template.
-  let file = process.env.DASH_CONFIG || path.join(ROOT, 'config.json');
+  let file = CONFIG_FILE();
   if (!process.env.DASH_CONFIG && !existsSync(file)) {
     file = path.join(ROOT, 'config.example.json');
     console.warn('[config] config.json not found, using config.example.json (copy it to config.json to customise)');

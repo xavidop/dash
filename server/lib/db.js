@@ -8,6 +8,8 @@ const BACKUP_DIR = path.join(DATA_DIR, 'backups');
 const KEEP_AUTO = 14; // daily copies kept
 const KEEP_MANUAL = 10; // copies taken before a restore
 
+const seedHash = (defaults) => createHash('sha1').update(JSON.stringify(defaults || {})).digest('hex');
+
 /** What a backup carries: everything the household entered, not caches or config bookkeeping. */
 const BACKUP_KEYS = {
   favorites: 'object',
@@ -31,7 +33,7 @@ export class Db {
    */
   constructor(defaults, baseSettings = {}) {
     this.data = { version: 1, favorites: { teams: [], drivers: [], players: [], symbols: [] }, notes: [], countdowns: [], settings: {} };
-    const hash = createHash('sha1').update(JSON.stringify(defaults || {})).digest('hex');
+    const hash = seedHash(defaults);
 
     if (existsSync(DB_FILE)) {
       try {
@@ -135,6 +137,14 @@ export class Db {
     const last = this.backups().find((b) => b.kind === 'auto');
     if (last && Date.now() - last.at < 20 * 3600e3) return null;
     return this.snapshot('auto');
+  }
+
+  /** config.json was just rewritten from this data: take it as already applied, so the next start
+   *  doesn't treat it as a hand edit (re-seeding favourites or dropping settings). */
+  rebase(defaults, baseSettings) {
+    this.data.seedHash = seedHash(defaults);
+    this.data.settingsBase = baseSettings;
+    this.save();
   }
 
   // ── General settings (overrides on top of config.json) ──

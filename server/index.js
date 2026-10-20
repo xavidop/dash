@@ -1,7 +1,7 @@
 import express from 'express';
 import path from 'node:path';
 import { existsSync } from 'node:fs';
-import { loadConfig, ROOT } from './lib/config.js';
+import { loadConfig, updateConfigFile, ROOT } from './lib/config.js';
 import { setLanguage, LANGUAGES } from './lib/i18n.js';
 import { readFileSync } from 'node:fs';
 import { Store } from './lib/store.js';
@@ -53,6 +53,27 @@ function applySettings() {
   setLanguage(config.language);
 }
 applySettings();
+
+/** Mirror favourites and on-screen settings into config.json, so it's always the real setup. */
+function syncConfigFile() {
+  try {
+    const fav = db.favorites();
+    const changed = updateConfigFile((user) => {
+      for (const k of Object.keys(db.settings())) if (SETTING_KEYS.includes(k)) user[k] = config[k];
+      user.favorites = { ...user.favorites, teams: fav.teams, drivers: fav.drivers, players: fav.players, leagues: fav.leagues || [] };
+      user.finance = { ...user.finance, symbols: fav.symbols || [] };
+    });
+    if (!changed) return;
+    // Bookkeeping from the file as the next start will read it.
+    const fresh = loadConfig();
+    const freshBase = structuredClone(pick(fresh, SETTING_KEYS));
+    Object.assign(base, freshBase);
+    db.rebase({ ...fresh.favorites, symbols: fresh.finance.symbols || [] }, freshBase);
+  } catch (err) {
+    console.warn('[config] could not update config.json:', err.message);
+  }
+}
+syncConfigFile();
 
 const store = new Store();
 const location = new LocationProvider(config, store);
@@ -463,6 +484,7 @@ app.put('/api/settings', async (req, res) => {
   const before = { ...pick(config, ['language', 'timezone']), features: { ...config.features }, region: config.electricity.region, calendars: JSON.stringify(config.calendar.urls) };
   db.setSettings(patch);
   applySettings();
+  syncConfigFile();
   res.json({ settings: pick(config, SETTING_KEYS) });
 
   // Apply live: language/timezone changes re-localize every section.
@@ -551,6 +573,7 @@ app.put('/api/favorites', async (req, res) => {
   if (Array.isArray(body.players))
     clean.players = body.players.filter((p) => p?.id).map((p) => ({ id: String(p.id), name: String(p.name || ''), tour: p.tour === 'wta' ? 'wta' : 'atp', flag: p.flag || null }));
   db.setFavorites(clean);
+  syncConfigFile();
   res.json(favoritesView());
   if (clean.symbols) {
     refreshFinance();
@@ -721,6 +744,7 @@ app.post('/api/backup/restore', express.json({ limit: '20mb' }), async (req, res
   // Everything that reads the DB starts again from the restored data.
   const lang = config.language;
   applySettings();
+  syncConfigFile();
   buildProviders();
   publishNotes();
   publishCountdowns();
