@@ -107,7 +107,17 @@ store.on('update', (key, section) => broadcast('update', { key, section }));
  * everything, which is how a burst of restarts gets a source to start refusing us.
  */
 function every(ms, fn, fresh = null) {
-  const run = () => fn().catch((err) => console.warn('[job]', err.message));
+  // Never stack runs: if the last one is still going (a slow source), skip this tick.
+  let running = false;
+  const run = () => {
+    if (running) return;
+    running = true;
+    fn()
+      .catch((err) => console.warn('[job]', err.message))
+      .finally(() => {
+        running = false;
+      });
+  };
   const age = fresh?.(ms);
   if (age == null) run();
   setTimeout(() => {
@@ -183,7 +193,10 @@ async function refreshFavorites(opts) {
   } catch (err) {
     store.fail('teams', err);
   }
-  // New team cards can mean a game entered the pre-match window, or new leagues to show rounds for.
+  // New team cards can mean a game entered the pre-match window, or new leagues to show rounds for
+  // (and new competitions, e.g. a cup draw, for the live poller).
+  const polled = liveLeagues().map((l) => `${l.provider}:${l.league}`);
+  if (live && polled.some((id) => !live.leagues.some((l) => l.id === id))) live.setLeagues(liveLeagues());
   refreshPreviews().catch(() => {});
   const shown = (store.get('rounds')?.data?.rounds || []).map((r) => r.key).sort().join();
   if (shown !== matchday.roundLeagues().sort().join()) refreshRounds().catch(() => {});
@@ -806,6 +819,8 @@ app.get('/api/spotify/lyrics', async (req, res) => {
   }
 });
 app.post('/api/spotify/duck', spotifyRoute((req) => spotify.duck(!!req.body?.on)));
+// Screens still think it's connected until they get a fresh snapshot.
+spotify.onLogout = () => broadcast('snapshot', snapshot());
 spotify.refresh();
 
 // ─── Countdowns (local DB) ──────────────────────────────────

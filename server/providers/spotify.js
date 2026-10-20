@@ -108,7 +108,8 @@ export class SpotifyService {
       signal: AbortSignal.timeout(15000),
     });
     const d = await res.json().catch(() => ({}));
-    if (!res.ok) throw new SpotifyError(d.error_description || d.error || `token HTTP ${res.status}`, res.status === 400 ? 401 : 502);
+    // Only invalid_grant means the sign-in is gone; any other failure is worth retrying later.
+    if (!res.ok) throw new SpotifyError(d.error_description || d.error || `token HTTP ${res.status}`, d.error === 'invalid_grant' ? 401 : 502);
     // PKCE refresh may or may not rotate the refresh token: keep the old one if none comes back.
     return { ...this.tokens, ...d, refresh_token: d.refresh_token || this.tokens?.refresh_token, expires_at: Date.now() + (d.expires_in || 3600) * 1000 - 60e3 };
   }
@@ -116,13 +117,22 @@ export class SpotifyService {
   async accessToken() {
     if (!this.connected) throw new SpotifyError('Spotify is not connected', 401);
     if (Date.now() < (this.tokens.expires_at || 0)) return this.tokens.access_token;
-    try {
-      this.saveTokens(await this.tokenRequest({ grant_type: 'refresh_token', refresh_token: this.tokens.refresh_token }));
-    } catch (err) {
-      // A revoked or expired sign-in: forget it so Settings offers "Connect" again.
-      if (err.status === 401) this.logout();
-      throw err;
-    }
+    // One refresh at a time: Spotify rotates the refresh token, so a second concurrent refresh
+    // (the poll plus a command) would be refused with invalid_grant and sign us out.
+    this.refreshing ??= this.tokenRequest({ grant_type: 'refresh_token', refresh_token: this.tokens.refresh_token })
+      .then((t) => this.saveTokens(t))
+      .catch((err) => {
+        // A revoked or expired sign-in: forget it so Settings offers "Connect" again.
+        if (err.status === 401) {
+          this.logout();
+          this.onLogout?.();
+        }
+        throw err;
+      })
+      .finally(() => {
+        this.refreshing = null;
+      });
+    await this.refreshing;
     return this.tokens.access_token;
   }
 
@@ -134,13 +144,19 @@ export class SpotifyService {
     this.publish(null);
   }
 
-  async api(method, url, body) {
+  async api(method, url, body, retried = false) {
     const res = await fetch(url.startsWith('http') ? url : `${API}${url}`, {
       method,
       headers: { Authorization: `Bearer ${await this.accessToken()}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
       body: body ? JSON.stringify(body) : undefined,
       signal: AbortSignal.timeout(12000),
     });
+    // Access token rejected before its expiry: get a new one and try once more.
+    if (res.status === 401 && !retried && this.tokens) {
+      this.tokens.expires_at = 0;
+      return this.api(method, url, body, true);
+    }
+    if (res.status === 429) this.backoffUntil = Date.now() + (Number(res.headers.get('retry-after')) || 30) * 1000;
     if (res.status === 204 || res.status === 202) return null;
     const text = await res.text();
     const d = text ? JSON.parse(text) : null;
@@ -156,7 +172,9 @@ export class SpotifyService {
   async refresh() {
     clearTimeout(this.timer);
     let next = 30e3;
-    if (this.enabled && this.connected) {
+    // Rate-limited: wait out Spotify's Retry-After instead of polling into a longer ban.
+    if (this.backoffUntil > Date.now()) next = Math.max(next, this.backoffUntil - Date.now());
+    else if (this.enabled && this.connected) {
       try {
         const p = await this.api('GET', '/me/player?additional_types=episode');
         // null when nothing is playing on any device (Spotify answers 204 with no body).

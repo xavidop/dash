@@ -120,7 +120,9 @@ export class RecipeIdeas {
     const day = now.toLocaleDateString('en-CA', { timeZone: this.config.timezone });
     const hour = Number(now.toLocaleString('en-GB', { hour: '2-digit', hour12: false, timeZone: this.config.timezone }));
     const prev = this.store.get('recipeIdeas')?.data;
-    const sameDay = prev?.day === day && prev?.language === this.config.language;
+    // The extra idea is a breakfast in the morning and a dessert later: a new set when that flips.
+    const extra = hour < 11 ? 'Breakfast' : 'Dessert';
+    const sameDay = prev?.day === day && prev?.language === this.config.language && (prev.extra ?? extra) === extra;
     const round = sameDay ? (prev.round || 0) + (shuffle ? 1 : 0) : 0;
     if (sameDay && !shuffle && prev.items?.length) return prev;
     const picks = pickIdeas(await this.pool(), `${day}:${round}`, hour);
@@ -149,7 +151,7 @@ export class RecipeIdeas {
         console.warn('[recipes] translation failed:', err.message);
       }
     }
-    return { day, round, language: this.config.language, translated: this.translating(), items };
+    return { day, round, extra, language: this.config.language, translated: this.translating(), items };
   }
 
   /** The full recipe (for the preview and cooking mode), translated when needed. */

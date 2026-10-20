@@ -116,7 +116,10 @@ export class BracketService {
       }
       const d = await fetchJson(`${ESPN}/${path}/scoreboard?dates=${ym}&limit=500`);
       const list = d.events || [];
-      if (ym < yyyymm(now)) this.months.set(cacheKey, list);
+      // A past month is final once every game in it is: right after the 1st (UTC) US games from
+      // the last night can still be live, and caching them then would freeze them until a restart.
+      const done = list.every((e) => ['post', 'postponed', 'canceled'].includes(e.status?.type?.state) || /postponed|canceled/i.test(e.status?.type?.name || ''));
+      if (ym < yyyymm(now) && done) this.months.set(cacheKey, list);
       events.push(...list);
     }
     return events;

@@ -10,10 +10,14 @@ const paused = new Map(); // host → { until, wait }
 // "refresh everything" can't turn into a burst. ESPN is the one that pushes back.
 const MIN_GAP_MS = { 'site.api.espn.com': 700, 'site.web.api.espn.com': 700, 'sports.core.api.espn.com': 700 };
 const nextSlot = new Map(); // host → earliest start of the next request
+const MAX_QUEUE_MS = 60e3;
 async function waitTurn(host) {
   const gap = MIN_GAP_MS[host];
   if (!gap) return;
   const slot = Math.max(Date.now(), nextSlot.get(host) || 0);
+  // A queue over a minute long means demand outruns the speed limit: refuse instead of letting it
+  // grow for hours (stale cards until a restart). The job keeps its last data and retries later.
+  if (slot - Date.now() > MAX_QUEUE_MS) throw new Error(`${host} is busy (too many queued requests)`);
   nextSlot.set(host, slot + gap);
   if (slot > Date.now()) await new Promise((r) => setTimeout(r, slot - Date.now()));
 }
@@ -61,7 +65,17 @@ export function fetchText(url, opts = {}) {
   const key = `${url}|${JSON.stringify(opts.headers || {})}`;
   const pending = inFlight.get(key);
   if (pending) return pending;
-  const promise = request(url, opts).finally(() => inFlight.delete(key));
+  // Hard deadline on top of fetch's own timeout: a request stuck mid-body would otherwise stay
+  // in flight forever, and every later caller of this URL would wait on it until a restart.
+  const limit = (opts.timeoutMs ?? 12000) + 5000;
+  let timer;
+  const deadline = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`no answer after ${limit / 1000}s (${new URL(url).host})`)), limit);
+  });
+  const promise = Promise.race([request(url, opts), deadline]).finally(() => {
+    clearTimeout(timer);
+    inFlight.delete(key);
+  });
   inFlight.set(key, promise);
   return promise;
 }
