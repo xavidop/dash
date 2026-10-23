@@ -169,9 +169,20 @@ function armIdle() {
   clearTimeout(idleTimer);
   // Wait for Dash to finish talking, then give the user a few seconds to follow up.
   const wait = Math.max(0, speakingUntil - Date.now()) + (cfg()?.idleSeconds ?? 8) * 1000;
-  idleTimer = window.setTimeout(() => (ending || !heardSinceTurn ? close() : armIdle()), wait);
+  idleTimer = window.setTimeout(() => {
+    if (ending) return close();
+    // Never hang up mid-answer: a long reply (or a briefing that searches first) can still be
+    // generating or playing when the timer fires.
+    if (replying || isSpeaking() || heardSinceTurn) return armIdle();
+    close();
+  }, wait);
 }
 let heardSinceTurn = false;
+// A turn is in progress (we asked, or the user spoke) and Gemini hasn't sent turnComplete yet.
+let replying = false;
+// Dash has started answering this turn. The mic stays muted until turnComplete, not just while audio
+// plays, so a gap mid-answer (a search, a slow chunk) can't let room noise barge in and cut it off.
+let dashTurn = false;
 
 /** Opens the assistant (mic button, cooking screen, scheduled briefing). `prompt` is sent as text first. */
 export const openAssistant = (prompt?: string) => open(false, prompt);
@@ -183,6 +194,8 @@ async function open(preroll: boolean, prompt?: string) {
   turnOpen = { user: false, dash: false };
   errorText = '';
   ending = false;
+  replying = false;
+  dashTurn = false;
   setPhase('connecting');
   chime(true);
   const pending = preroll ? ring.slice() : [];
@@ -207,10 +220,13 @@ async function open(preroll: boolean, prompt?: string) {
     }
     if (m.setupComplete) {
       setPhase('listening');
-      if (prompt) ws?.send(JSON.stringify({ realtimeInput: { text: prompt } }));
+      if (prompt) {
+        replying = true;
+        ws?.send(JSON.stringify({ realtimeInput: { text: prompt } }));
+      }
       for (const c of pending) sendAudio(c);
       onChunk = (pcm) => {
-        if (!isSpeaking()) sendAudio(pcm);
+        if (!dashTurn && !isSpeaking()) sendAudio(pcm);
       };
       maxTimer = window.setTimeout(close, MAX_SESSION_MS);
       armIdle();
@@ -223,11 +239,14 @@ async function open(preroll: boolean, prompt?: string) {
     if (sc.inputTranscription?.text) {
       say('user', sc.inputTranscription.text);
       heardSinceTurn = true;
+      replying = true;
       if (phase === 'listening') setPhase('thinking');
       else render();
     }
     for (const p of sc.modelTurn?.parts || []) {
       if (p.inlineData?.data) {
+        replying = true;
+        dashTurn = true;
         play(p.inlineData.data);
         if (phase !== 'speaking') setPhase('speaking');
       }
@@ -236,9 +255,14 @@ async function open(preroll: boolean, prompt?: string) {
       say('dash', sc.outputTranscription.text);
       render();
     }
-    if (sc.interrupted) stopPlayback();
+    if (sc.interrupted) {
+      dashTurn = false;
+      stopPlayback();
+    }
     if (sc.turnComplete) {
       heardSinceTurn = false;
+      replying = false;
+      dashTurn = false;
       turnOpen = { user: false, dash: false };
       window.setTimeout(() => {
         if (phase === 'speaking' || phase === 'thinking') setPhase('listening');
@@ -336,22 +360,33 @@ function close() {
 }
 
 // ─── Wake word ──────────────────────────────────────────────
-type Recognition = { lang: string; continuous: boolean; interimResults: boolean; start(): void; stop(): void; abort(): void; onresult: ((e: any) => void) | null; onend: (() => void) | null; onerror: ((e: any) => void) | null };
+type Recognition = { lang: string; continuous: boolean; interimResults: boolean; maxAlternatives: number; start(): void; stop(): void; abort(): void; onresult: ((e: any) => void) | null; onend: (() => void) | null; onerror: ((e: any) => void) | null };
 let rec: Recognition | null = null;
 let wakeOn = false;
 let wakeBlocked = false;
 let restartDelay = 300;
+let wakeFailed = false;
 
 const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\p{L}\p{N}\s]/gu, ' ');
 
-/** Exact wake words anywhere; sound-alikes ("das", "dach") only after "hey/oye/ok…", since "das" is a common word. */
-function wakeRegex() {
+/**
+ * Exact wake words anywhere. Sound-alikes ("das", "dax") only after "hey/oye/ok…", or as a whole final
+ * utterance (just "Dash" said alone, which a Spanish recognizer often writes "das"), since "das" is a
+ * common word.
+ */
+function wakeRegexes() {
   const words = (cfg()?.wakeWords || ['dash']).map(norm).map((w) => w.trim()).filter(Boolean);
-  const alike = words.flatMap((w) => (w === 'dash' ? ['dasch', 'dach', 'dache', 'dass', 'dahs', ...(getState().config?.language === 'de' ? [] : ['das'])] : []));
+  const de = getState().config?.language === 'de';
+  const alike = words.flatMap((w) => (w === 'dash' ? ['dasch', 'dach', 'dache', 'dass', 'dahs', 'dax', 'dashe', 'tash', 'tach', ...(de ? [] : ['das'])] : []));
   const esc = (w: string) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const exact = words.map(esc).join('|');
   const loose = alike.map(esc).join('|');
-  return new RegExp(`(?:^|\\s)(?:${exact})(?:\\s|$)${loose ? `|(?:^|\\s)(?:hey|hei|ei|ey|oye|ok|okay|hola|hallo|ehi|eh)\\s+(?:${loose})(?:\\s|$)` : ''}`);
+  const hey = 'hey|hei|ei|ey|ay|hay|oye|oie|ok|okay|hola|hallo|ehi|eh|he';
+  return {
+    any: new RegExp(`(?:^|\\s)(?:${exact})(?:\\s|$)${loose ? `|(?:^|\\s)(?:${hey})\\s+(?:${loose})(?:\\s|$)` : ''}`),
+    // Only on final results: an interim "das" may still grow into "das ist…" / "das la vuelta".
+    alone: loose ? new RegExp(`^\\s*(?:(?:${hey})\\s+)?(?:${loose})\\s*$`) : null,
+  };
 }
 
 function startWake() {
@@ -363,15 +398,22 @@ function startWake() {
   rec.lang = getState().config?.locale || defaultLocale();
   rec.continuous = true;
   rec.interimResults = true;
-  const re = wakeRegex();
+  // "Dash" isn't a word in most languages: the right spelling is often only the 2nd or 3rd guess.
+  rec.maxAlternatives = 3;
+  const re = wakeRegexes();
+  wakeFailed = false;
   rec.onresult = (e: any) => {
     for (let i = e.resultIndex; i < e.results.length; i++) {
+      const r = e.results[i];
       // Cooking: short commands ("next", "siguiente paso") act at once, without Gemini.
-      if (e.results[i].isFinal && cookingCommand(norm(e.results[i][0].transcript))) return;
-      if (re.test(` ${norm(e.results[i][0].transcript)} `)) {
-        restartDelay = 300;
-        open(true);
-        return;
+      if (r.isFinal && cookingCommand(norm(r[0].transcript))) return;
+      for (let j = 0; j < r.length; j++) {
+        const said = norm(r[j].transcript);
+        if (re.any.test(` ${said} `) || (r.isFinal && re.alone?.test(said))) {
+          restartDelay = 300;
+          open(true);
+          return;
+        }
       }
     }
   };
@@ -380,19 +422,22 @@ function startWake() {
       wakeBlocked = true;
       console.warn('[assistant] wake word unavailable:', e.error, '(tap the mic button instead)');
     }
+    // Silence ("no-speech") and our own abort are normal; anything else (network, audio-capture) backs off.
+    else if (e.error !== 'no-speech' && e.error !== 'aborted') wakeFailed = true;
   };
   rec.onend = () => {
     wakeOn = false;
     btn.classList.remove('wake');
     rec = null;
-    // Recognition stops on its own every so often: restart, backing off if it keeps failing.
-    if (phase === 'off' && cfg() && !wakeBlocked) window.setTimeout(startWake, (restartDelay = Math.min(restartDelay * 2, 30000)));
+    // Recognition stops on its own after a few seconds of silence or a minute of talk: restart at
+    // once, so it's deaf as little as possible. Back off only while it keeps failing.
+    restartDelay = wakeFailed ? Math.min(restartDelay * 2, 30000) : 300;
+    if (phase === 'off' && cfg() && !wakeBlocked) window.setTimeout(startWake, restartDelay);
   };
   try {
     rec.start();
     wakeOn = true;
     btn.classList.add('wake');
-    window.setTimeout(() => wakeOn && (restartDelay = 300), 10000);
   } catch {
     rec = null;
   }
@@ -538,6 +583,7 @@ export function initAssistant() {
     if ((e.target as HTMLElement).closest('[data-as-close]') || e.target === sheet) return close();
     // Tap while Dash talks: stop talking and listen.
     if (phase === 'speaking') {
+      dashTurn = false;
       stopPlayback();
       setPhase('listening');
       armIdle();
